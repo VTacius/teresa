@@ -4,27 +4,25 @@
 var api = '/estado.php';
 var tiempoRecarga = 20000;
 
-var obtenerDatos = function(url){
-    return new Promise(function(resolve, reject){
-        var peticion = new XMLHttpRequest();
-        peticion.open('GET', api, true);
+var obtenerDatos = new Promise(function(resolve, reject){
+    var peticion = new XMLHttpRequest();
+    peticion.open('GET', api, true);
+	peticion.onload = function(){
+		if (peticion.status === 200){
+			var datos = JSON.parse(peticion.response);
+			resolve(datos);
+			peticion = null;
+		} else{
+			reject(new Error(peticion.statusText));
+		}
+	};
 
-        peticion.onreadystatechange = function (){
-        	if (this.readyState === 4) {
-        		if (this.status >= 200 && this.status < 400) {
-          			var datos = JSON.parse(this.responseText);
-        			resolve(datos);
-                    peticion = null;
-        		} else {
-          			reject(Error('Hubo un error al intentar acceder a los datos'));
-                    peticion = null;
-        		}
-        	} 
-        }
-        
-        peticion.send();
-    });
-};
+	peticion.onerror = function(){
+		reject(new Error("Error al intentar acceder a los datos"));
+	};
+    
+    peticion.send();
+});
 
 /* 
  * Creo el mapa. El mapa debe ser lo primer en cargar para que el usuario no se sienta mal, so
@@ -38,15 +36,8 @@ var tile_url = "{s}.tile.openstreetmap.org";
 /* Esto es básicamente la configuración inicial del mapa */
 var mapa = L.map('mapaid').setView([default_lat, default_lng], default_zoom);
 L.tileLayer('//' + tile_url + '/{z}/{x}/{y}.png', {
-    attribution: '<a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(mapa);
-
-/* Facilita la creación de un titulo para el popup de los marcadores */ 
-var creaTituloMarca = function(dataObjeto){
-    return '<b>' + dataObjeto.nombre + '</b>:<br>' + 
-        'Estado: <b>' + configuraEstado(dataObjeto.estado) + '</b>' +
-        ' desde <b>' + dataObjeto.duracion + '</b>'
-};
 
 /*
  * Creo los íconos personalizados, algo de mucho valor por acá
@@ -57,7 +48,7 @@ var data = {};
 /* Configuración inicial y común a todos los íconos */
 var LeafIcon = L.Icon.extend({
     options: {
-        iconSize: [16, 16],
+        iconSize: [16, 16]
     }
 });
 
@@ -104,18 +95,21 @@ var configuraEstado = function(estado){
     }else {
 		return 'unk';
 	}
-}
+};
 
 /* Auxiliar para formar el cambiante ícono: Se basa en tipo de marcador y estado actual */
 var configuraIcono = function(dataObjeto){
-    if (dataObjeto.tipo in iconos){
-        var tipo = dataObjeto.tipo;
-    } else {
-        /* TODO: Establecer un tipo por defecto */
-        var tipo = 'sibasi'; 
-    }
-    icono = iconos[tipo][configuraEstado(dataObjeto.estado)];
+    /* TODO: Establecer un tipo por defecto */
+    var tipo = iconos.hasOwnProperty(dataObjeto.tipo) ? dataObjeto.tipo : 'sibasi';
+    var icono = iconos[tipo][configuraEstado(dataObjeto.estado)];
     return icono;
+};
+
+/* Auxiliar que facilita la creación de un titulo para el popup de los marcadores */ 
+var creaTituloMarca = function(dataObjeto){
+    return '<b>' + dataObjeto.nombre + '</b>:<br>' + 
+        'Estado: <b>' + configuraEstado(dataObjeto.estado) + '</b>' +
+        ' desde <b>' + dataObjeto.duracion + '</b>';
 };
 
 
@@ -124,15 +118,16 @@ var configuraIcono = function(dataObjeto){
  * TODO: ¿Deberíamos esperar a que el mapa estuviera cargado, entre otras cosas que podría esperar ?
  */
 
+
 /* Hacemos la creación inicial de los marcadores */
 var iniciaMarcadores = function(datos){
 	Object.keys(datos).forEach(function(clave){
         marcas[clave] = L.marker([datos[clave].latitude, datos[clave].longitude], {icon: configuraIcono(datos[clave])})
             .addTo(mapa);
-	    /* TODO: Debe ser una función bien bonita que incluso pudiera poner valores por defecto, y modificarlos después */
 	    marcas[clave].bindPopup(creaTituloMarca(datos[clave]));
+	    /* TODO: Debe ser una función bien bonita que incluso pudiera poner valores por defecto, y modificarlos después */
     });
-    
+   	
     /* Es decir, la data global se llena con los datos obtenidos desde la primera llamada al servidor */
     data = datos; 
 };
@@ -147,16 +142,29 @@ var actualizaMarcadores = function(datos){
             marcas[est]._popup._content = creaTituloMarca(datos[est]);
         }
     }); 
-    
+   
     /* TODO: ¿Existe una mejor forma para agregar datos? ¿Es este método minímamente correcto */
     data = datos; 
 };
 
+/* Obtenemos los datos requeridos por primera vez*/
+obtenerDatos.
+    then(iniciaMarcadores).
+    catch(function(e){
+        console.log("NF: Hubo un error, puedo manejarlo");
+        console.log(e);
+    });
 
-obtenerDatos(api).then(iniciaMarcadores, function(error){console.log(error)}); 
 
+/* Obtenemos los datos requeridos para verificar su actualización cada cierto tiempo */
 setInterval(function(){
     console.log('tempo');
-    obtenerDatos(api).then(actualizaMarcadores, function(error){console.log(error)});
+    obtenerDatos.
+    	then(iniciaMarcadores).
+    	catch(function(e){
+    	    console.log("NF: Hubo un error, puedo manejarlo");
+    	    console.log(e);
+    	});
 }, tiempoRecarga);
+
 
