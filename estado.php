@@ -41,11 +41,12 @@ foreach($datos['devices'] as $d){
     list($latitude, $longitude) = parsea_localidad($d['location']);
     list($tipo, $nombre) = parsea_descripcion($d['purpose']);
     if (is_string($latitude) and is_string($tipo)){
-    	$salida[] = [ 
+    	$salida[$d['hostname']] = [ 
     	    'tipo' => $tipo,
     	    'nombre' => $nombre,
     	    'latitude' => $latitude,
     	    'longitude' => $longitude,
+            'hostname' => $d['hostname'],
     	    'estado' => $d['status'],
     	    'duracion' => $d['last_polled']
     	];
