@@ -1,20 +1,16 @@
 /* 
  * Accedo a los datos 
  */
-var api = '/estadio.php';
+var api = '/estado.php';
 var tiempoRecarga = 20000;
 
 var obtenerDatos = function(){
     return new Promise(function(resolve, reject){
-    	console.log('Al menos hago promesa');
         var peticion = new XMLHttpRequest();
         peticion.open('GET', api, true);
     	peticion.onload = function(){
-    		console.log(peticion.status);
     		if (peticion.status === 200){
     			var datos = JSON.parse(peticion.response);
-    			console.log('Estoy en medio de la petición de datos');
-                console.log(datos['10.20.40.1']);
     			resolve(datos);
     			peticion = null;
     		} else{
@@ -128,7 +124,6 @@ var creaTituloMarca = function(dataObjeto){
 
 /* Hacemos la creación inicial de los marcadores */
 var iniciaMarcadores = function(datos){
-    console.log('inicializando marcadores');
 	Object.keys(datos).forEach(function(clave){
 		var host = datos[clave];
         marcas[host['hostname']] = L.marker([host.latitude, host.longitude], {icon: configuraIcono(host)})
@@ -144,13 +139,9 @@ var iniciaMarcadores = function(datos){
     
 /* Actualizamos sólo aquellas marcas que de veras lo requieran */
 var actualizaMarcadores = function(datos){
-    console.log('actualizando marcadores');
-    console.log(data['10.20.40.1']);
-    console.log(datos['10.20.40.1']);
     /* Con este enfoque, hasta ahora, implica que para que se agregue un sitio habrá que actualizar página */
     Object.keys(marcas).forEach(function(est){
         if (datos[est].estado !== data[est].estado){
-            console.log(data[est].estado, datos[est].estado, datos[est].hostname);
             marcas[est].setIcon(configuraIcono(datos[est]));
             marcas[est]._popup._content = creaTituloMarca(datos[est]);
         }
@@ -169,6 +160,7 @@ obtenerDatos().then(iniciaMarcadores).catch(function(e){
 
 /* Obtenemos los datos requeridos para verificar su actualización cada cierto tiempo */
 setInterval(function(){
+    console.log('tempo');
     obtenerDatos().then(actualizaMarcadores).catch(function(e){
            console.log("NF: Hubo un error, puedo manejarlo");
            console.log(e);
