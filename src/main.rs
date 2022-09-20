@@ -1,3 +1,5 @@
+mod backend;
+
 use futures_util::{Stream, StreamExt};
 
 use std::sync::{Mutex, Arc};
@@ -6,33 +8,29 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use warp::{Filter, sse::Event};
 
-type Canal = Arc<Mutex<Vec<mpsc::UnboundedSender<u64>>>>;
+use backend::{ListaDispositivos, obtener_dispositivos};
+type Canal = Arc<Mutex<Vec<mpsc::UnboundedSender<ListaDispositivos>>>>;
 
-fn difundir_mensaje(ts: u64, canal: &Canal) {
+fn difundir_mensaje(devices: ListaDispositivos, canal: &Canal) {
     //let mensaje = format!("> {}", ts);
     canal.lock().unwrap().retain(|tx| {
-        tx.send(ts).is_ok()
+        tx.send(devices.clone()).is_ok()
     });
 } 
 
 fn recibir_mensaje(canal: Canal) -> impl Stream<Item = Result<Event, warp::Error>> + Send + 'static {
     let (tx, rx) = mpsc::unbounded_channel();
     let rx = UnboundedReceiverStream::new(rx);
-    
+   
     canal.lock().unwrap().push(tx);
 
-    rx.map(|mensaje| {Ok(Event::default().data(format!("> {}", mensaje)))})
+    rx.map(|dispositivos| {Ok(Event::default().json_data(dispositivos).unwrap())})
 }
 
 fn inicio () -> Result<warp::hyper::Response<&'static str>, warp::http::Error>{
     warp::http::Response::builder()
         .header("content-type", "text/html; charset=utf-8")
         .body(INDEX_HTML)
-}
-
-fn backend(ts :u64) -> u64 {
-    println!("Estoy accediendo a backend");
-    (ts + 1) % 25
 }
 
 #[tokio::main]
@@ -44,9 +42,11 @@ async fn main() {
     let cartero = warp::path("cartero")
         .and(warp::path::param::<u64>())
         .and(canal.clone())
-        .map(|ts, canal| {
-            let ts = backend(ts);
-            difundir_mensaje(ts, &canal);
+        .map(|_ts, canal| {
+            // Antes de todo, enviamos también su ts para que quede guardado
+            // Obtenemos los dispositivos
+            let dispositivos = obtener_dispositivos();
+            difundir_mensaje(dispositivos, &canal);
             warp::reply()
         });
     
@@ -71,34 +71,58 @@ static INDEX_HTML :&str = r#"
 <!DOCTYPE html>
 <html>
     <head>
-        <title> Warp, ese concepto </title>
+        <title> Mapa de Estado para dispositivos </title>
+        <link rel="stylesheet" href="https://unpkg.com/modern-css-reset/dist/reset.min.css" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css" integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ==" crossorigin="" />
+        <style type="text/css">
+            body {
+                height: 600px;
+            }
+            .mapa {
+                height: 590px;
+            }
+            
+        </style>
     </head>
     <body>
-        <h2> Prueba de contenido </h2>
-        <div id="estado">Conectando...</div>
-        <div id="contenido"></div>
-        <script type="text/javascript">
-            
-            let uri = 'http://' + location.host + '/buzon';
-            let sse = new EventSource(uri);
-
-            function mostrarMensaje(data) {
-                console.log(data);
-                let linea = document.createElement('p');
-                linea.innerText = data;
-                contenido.appendChild(linea);
-            }
-
-            sse.onopen = function(){
-                estado.innerHTML = "Conectado al servidor";
-            }
-
-            sse.onmessage = function(mensaje) {
-                mostrarMensaje(mensaje.data);
-            }
-
-        </script>
+        <div id="mapa"></div>
     </body>
-</html>
+    <script src="https://unpkg.com/leaflet@1.8.0/dist/leaflet.js" integrity="sha512-BB3hKbKWOc9Ez/TAwyWxNXeoV9c1v6FIeYiBieIWkpLjauysF18NzgR1MBNBXf8/KABdlkX68nAhlwcDFLGPCQ==" crossorigin=""></script>
+    <script type="text/javascript">
+        // Los valores por defecto para el mapa
+        var default_lat = "13.8054";
+        var default_lng = "-88.9069";
+        var default_zoom = 10;
 
+        /**  Esto es básicamente la configuración inicial del mapa */
+        var mapa = L.map('mapa').setView([default_lat, default_lng], default_zoom);
+
+        /** Y esto hará que aparezca por arte de magia */
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(mapa);
+
+        
+        /** Aca empezamos con los datos */
+        let uri = 'http://' + location.host + '/buzon';
+        let sse = new EventSource(uri);
+            
+        function mostrarEstablecimientos(data) {
+            console.log(data);
+            let contenido = JSON.parse(data);
+            console.log(contenido);
+            contenido.forEach(point => {
+                L.marker([point.latitude, point.longitude]).addTo(mapa)
+                    .bindPopup('A pretty CSS3 popup.<br> Easily customizable.');
+                });
+            
+
+        }
+
+        sse.onmessage = function(mensaje) {
+            mostrarEstablecimientos(mensaje.data);
+        }
+
+    </script>
+</html>
 "#;
