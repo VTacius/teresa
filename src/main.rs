@@ -4,11 +4,12 @@ use futures_util::{Stream, StreamExt};
 
 use std::sync::{Mutex, Arc};
 
+use uuid::Uuid;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::UnboundedReceiverStream;
-use warp::{Filter, sse::Event};
+use warp::{Filter, sse::Event, http::Response};
 
-use backend::{ListaDispositivos, obtener_dispositivos};
+use backend::{ListaDispositivos, obtener_dispositivos, guardar_poller};
 type Canal = Arc<Mutex<Vec<mpsc::UnboundedSender<ListaDispositivos>>>>;
 
 fn difundir_mensaje(devices: ListaDispositivos, canal: &Canal) {
@@ -34,14 +35,21 @@ async fn main() {
     let canal = warp::any().map(move || canal.clone());
 
     let cartero = warp::path("cartero")
-        .and(warp::path::param::<u64>())
+        .and(warp::path::param::<Uuid>())
+        .and(warp::path::param::<f64>())
         .and(canal.clone())
-        .map(|_ts, canal| {
+        .map(|uuid, ts, canal| {
             // Antes de todo, enviamos también su ts para que quede guardado
+            guardar_poller(ts, uuid); 
             // Obtenemos los dispositivos
-            let dispositivos = obtener_dispositivos();
+            let dispositivos = obtener_dispositivos(ts, uuid);
+            // Enviamos el mensaje
             difundir_mensaje(dispositivos, &canal);
-            warp::reply()
+            // Devolvemos un resultado al poller
+            Response::builder()
+                .status(201)
+                .header("X-uuid-poller", uuid.to_string())
+                .body("")
         });
     
     let buzon = warp::path("buzon")
