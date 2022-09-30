@@ -1,32 +1,32 @@
-use serde::Serialize;
+use std::fs;
+
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Clone, Serialize)]
-pub struct Dispositivo {
-    //tipo' => $tipo,
-    //nombre' => $nombre,
-    pub latitude: f64, 
-    pub longitude: f64, 
-    pub hostname: String,
-    pub estado: bool 
-    //duracion' => $d['last_polled']
+#[derive(Clone, Deserialize, Serialize)]
+pub struct Servidor {
+    pub tipo: String,
+    pub estado: bool,
+    pub ttl: u32,
+    pub rtt: u32
 }
 
-impl Dispositivo {
-    pub fn new(hostname :String, latitude :f64, longitude :f64) -> Dispositivo {
-        let estado = true;
-        Dispositivo { latitude, longitude, hostname, estado }
-    }
+#[derive(Clone, Deserialize, Serialize)]
+pub struct Dispositivo {
+    pub tipo: String,
+    pub estado: String,
+    pub nombre: String,
+    pub servidores: Vec<Servidor>,
+    pub coordenadas: (f64, f64)
 }
 
 pub type ListaDispositivos = Vec<Dispositivo>;
 
 pub fn obtener_dispositivos(_ts: f64, _uuid: Uuid) -> ListaDispositivos {
-    vec![
-        Dispositivo::new("colmena".into(), 13.724791383896932, -88.93766858263731),
-        Dispositivo::new("lirio".into(), 13.734020931658755, -89.47048792178529),
-        Dispositivo::new("landaverde".into(), 13.768230880995919, -89.03663635076009),
-    ]
+    let data = fs::read_to_string("./src/datos_minsal.json").expect("No puedo abrir el archivo");
+    let contenido: ListaDispositivos = serde_json::from_str(&data).expect("Nada, error al deserializar");
+
+    contenido
 }
 
 pub fn guardar_poller(ts: f64, uuid: Uuid) {

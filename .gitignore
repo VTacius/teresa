@@ -5,3 +5,9 @@ config.php
 # Added by cargo
 
 /target
+
+# Añadidos por mi
+public/
+node_modules/
+yarn.lock
+datos_minsal.json

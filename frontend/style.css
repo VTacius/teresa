@@ -1,0 +1,87 @@
+html {
+    box-sizing: border-box;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+  
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
+#mapa {
+    color: red;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+
+.info ul {
+    padding: 0;
+}
+
+.info article {
+      font-family: "Roboto";
+      color: #292f33;
+      max-width: 19rem;
+    }
+  
+.info header {
+  display: flex;
+  align-items: center;
+  height: 2.0rem;
+}
+
+.info h1 {
+  padding: 0.35rem 0.2rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.2rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.info .servidor {
+  font-size: 0.9rem;
+  min-width: 20rem;
+  display: flex;
+  align-items: center;
+}
+
+.info span {
+  padding: 0.2rem 0.2rem;
+}
+
+.info .nombre {
+  flex-grow: 1;
+}
+
+.info .datos {
+  width: 4.2rem;
+}
+
+.info .caja {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.info .estado {
+  font-size: 0.8rem;
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.4rem;
+  color: #fff;
+}
+
+.info .arriba {
+  background-color: #07A353;
+}
+
+.info .abajo {
+  background-color: #A31F11;
+}
